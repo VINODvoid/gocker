@@ -24,6 +24,10 @@ func main(){
 	case "logs":
 		// add commands 
 		commands.ShowLogs(args)
+	case "stop":
+		commands.StopContainer(args)
+	case "rm":
+		commands.RemoveContainer(args)	
 	default:
 		fmt.Println("Unknown command",cmd)
 	}

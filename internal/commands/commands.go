@@ -13,6 +13,7 @@ func RunContainer(args[] string){
 		fmt.Println("Usage: gocker run <command>")
 		return
 	}
+	
 	container.Run(args)
 }
 func ListContainer(){
@@ -25,4 +26,19 @@ func ShowLogs(args[] string){
 	}
 	container.Logs(args[0])
 
+}
+func StopContainer(args []string) {
+	if len(args) == 0 {
+		fmt.Println("Usage: gocker stop <container_id>")
+		return
+	}
+	container.Stop(args[0])
+}
+
+func RemoveContainer(args []string) {
+	if len(args) == 0 {
+		fmt.Println("Usage: gocker rm <container_id>")
+		return
+	}
+	container.Remove(args[0])
 }
