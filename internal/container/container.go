@@ -1,21 +1,26 @@
 package container
 
 import (
+	"bufio"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
+	"strings"
 	"time"
 )
 
 type Container struct {
-	ID        string
-	command   string
+	ID      string
+	command string
+	PID     int
+	Env     []string
 	CreatedAt time.Time
 }
 
 var containers []Container
 
-func init(){
+func init() {
 	loadState()
 }
 func Run(args []string) {
@@ -41,7 +46,8 @@ func Run(args []string) {
 	}
 	containers = append(containers, Container{
 		ID:        containerID,
-		command:   args[0],
+		command:   strings.Join(args," "),
+		PID: cmd.Process.Pid,
 		CreatedAt: time.Now(),
 	})
 	saveState()
@@ -96,4 +102,89 @@ func Remove(containerID string) {
 		}
 	}
 	fmt.Println("Container not found.")
+}
+
+func LogsFollow(containerID string) {
+	filePath := fmt.Sprintf("logs/%s.log", containerID)
+	f, err := os.Open(filePath)
+	if err != nil {
+		fmt.Println("No logs found for:", containerID)
+		return
+	}
+	defer f.Close()
+
+	fmt.Printf("Following logs for %s...\n", containerID)
+	reader := bufio.NewReader(f)
+	for {
+		line, err := reader.ReadString('\n')
+		if err != nil {
+			time.Sleep(500 * time.Millisecond)
+			continue
+		}
+		fmt.Print(line)
+	}
+}
+
+func RunWithEnv(args []string, envVars []string) {
+	loadState()
+
+	cmd := exec.Command(args[0], args[1:]...)
+	cmd.Env = append(os.Environ(), envVars...) // Add env vars
+
+	// Make sure we capture stdout/stderr
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	containerID := fmt.Sprintf("c-%d", time.Now().UnixNano())
+	logFile := fmt.Sprintf("logs/%s.log", containerID)
+	f, err := os.Create(logFile)
+	if err != nil {
+		fmt.Println("Error creating log file:", err)
+		return
+	}
+	defer f.Close()
+
+
+	mw := io.MultiWriter(os.Stdout, f)
+	cmd.Stdout = mw
+	cmd.Stderr = mw
+
+	fmt.Println("Running container:", containerID)
+	if err := cmd.Start(); err != nil {
+		fmt.Println("Error:", err)
+		return
+	}
+
+	containers = append(containers, Container{
+		ID:        containerID,
+		command:   strings.Join(args, " "),
+		PID:       cmd.Process.Pid,
+		Env:       envVars,
+		CreatedAt: time.Now(),
+	})
+	saveState()
+
+	go func() {
+		cmd.Wait()
+		fmt.Println("Container exited:", containerID)
+	}()
+}
+
+
+
+func Exec(containerID string, args []string) {
+	for _, c := range containers {
+		if c.ID == containerID {
+			cmd := exec.Command(args[0], args[1:]...)
+			cmd.Dir = fmt.Sprintf("workspace/%s", c.ID)
+			cmd.Stdout = os.Stdout
+			cmd.Stderr = os.Stderr
+			cmd.Env = append(os.Environ(), c.Env...)
+			if err := cmd.Run(); err != nil {
+				fmt.Println("Error:", err)
+			}
+			return
+		}
+	}
+	fmt.Println("Container not found:", containerID)
 }

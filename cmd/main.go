@@ -28,6 +28,9 @@ func main(){
 		commands.StopContainer(args)
 	case "rm":
 		commands.RemoveContainer(args)	
+	case "exec":
+		commands.ExecContainer(args)
+	
 	default:
 		fmt.Println("Unknown command",cmd)
 	}
